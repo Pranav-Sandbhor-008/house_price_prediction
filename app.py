@@ -35,19 +35,27 @@ LABELS = {
 }
 
 
+
 def indian_number(value):
-    """Format a number using Indian digit grouping."""
-    value = f"{value:,.2f}"
-    integer, decimal = value.split(".")
-    if len(integer) > 3:
-        last_three = integer[-3:]
-        remaining = integer[:-3]
+    """Format numbers using the Indian numbering system."""
+    value = float(value)
+
+    # Keep exactly two decimal places
+    integer_part, decimal_part = f"{value:.2f}".split(".")
+
+    # Indian grouping: last 3 digits, then groups of 2
+    if len(integer_part) > 3:
+        last_three = integer_part[-3:]
+        remaining = integer_part[:-3]
+
         groups = []
         while remaining:
             groups.insert(0, remaining[-2:])
             remaining = remaining[:-2]
-        integer = ",".join(groups + [last_three])
-    return f"{integer}.{decimal}"
+
+        integer_part = ",".join(groups + [last_three])
+
+    return f"{integer_part}.{decimal_part}"
 
 
 HTML = r"""
