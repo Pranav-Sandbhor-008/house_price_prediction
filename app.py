@@ -1,20 +1,329 @@
+
 import os
 import pickle
-import warnings
 from datetime import datetime
 
 import numpy as np
-from flask import Flask, jsonify, request, Response
+from flask import Flask, request, render_template_string
 
-warnings.filterwarnings("ignore")
+app = Flask(__name__)
 
+# Load the trained Linear Regression model
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "linear.pkl")
 
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
+with open(MODEL_PATH, "rb") as file:
+    model = pickle.load(file)
 
-# Order MUST match the order used during training
+
+HTML = r"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PropValue | Property Price Predictor</title>
+<meta name="theme-color" content="#101827">
+
+<style>
+:root {
+  --bg: #f4f7fc;
+  --card: #ffffff;
+  --text: #17243a;
+  --muted: #718096;
+  --border: #e3e9f2;
+  --input: #ffffff;
+  --accent: #625cf5;
+  --accent2: #4b45d9;
+  --soft: #eeedff;
+  --shadow: 0 18px 55px rgba(31, 45, 80, .09);
+}
+body.dark {
+  --bg: #0c1220;
+  --card: #151e2e;
+  --text: #edf2ff;
+  --muted: #a1aec4;
+  --border: #29354a;
+  --input: #101827;
+  --accent: #948dff;
+  --accent2: #aaa5ff;
+  --soft: #282744;
+  --shadow: 0 18px 55px rgba(0, 0, 0, .24);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif;
+  transition: background .25s, color .25s;
+}
+button, input { font: inherit; }
+button { cursor: pointer; }
+.nav {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px max(5%, calc((100% - 1120px) / 2));
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.brand { display:flex; align-items:center; gap:11px; font-weight:800; font-size:20px; }
+.logo {
+  width:42px; height:42px; border-radius:13px; display:grid;
+  place-items:center; color:white; font-size:22px;
+  background:linear-gradient(135deg,#756cff,#4740d8);
+  box-shadow:0 6px 16px #625cf540;
+}
+.brand small { display:block; font-size:11px; font-weight:500; color:var(--muted); margin-top:2px; }
+.theme-btn {
+  border:1px solid var(--border); background:var(--card); color:var(--text);
+  border-radius:12px; padding:10px 14px; font-size:13px; font-weight:650;
+}
+main { max-width:1120px; margin:auto; padding:46px 22px 60px; }
+.hero { text-align:center; max-width:720px; margin:0 auto 32px; }
+.eyebrow {
+  display:inline-flex; align-items:center; gap:8px;
+  color:var(--accent); background:var(--soft); border-radius:30px;
+  padding:8px 13px; font-size:12px; font-weight:800; letter-spacing:.5px;
+}
+.hero h1 { font-size:clamp(32px,5vw,49px); letter-spacing:-1.8px; line-height:1.1; margin:20px 0 14px; }
+.hero h1 span {
+  background:linear-gradient(100deg,#7b73ff,#4c8fe8);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.hero p { color:var(--muted); line-height:1.8; font-size:15px; margin:0; }
+.layout { display:grid; grid-template-columns:1.08fr .92fr; gap:24px; align-items:start; }
+.card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:22px; box-shadow:var(--shadow); overflow:hidden;
+}
+.card-head { padding:24px 26px 18px; border-bottom:1px solid var(--border); }
+.card-head h2 { margin:0 0 7px; font-size:19px; }
+.card-head p { margin:0; font-size:13px; color:var(--muted); line-height:1.6; }
+.form-body { padding:24px 26px 26px; }
+.section-title {
+  display:flex; align-items:center; gap:9px; font-size:13px;
+  font-weight:800; margin:0 0 18px;
+}
+.section-icon {
+  width:30px; height:30px; display:grid; place-items:center;
+  background:var(--soft); color:var(--accent); border-radius:9px;
+}
+.fields { display:grid; grid-template-columns:1fr 1fr; gap:18px 14px; }
+.field label { display:block; font-size:12px; font-weight:700; margin-bottom:8px; }
+.field input {
+  width:100%; min-width:0; padding:13px 12px;
+  background:var(--input); border:1px solid var(--border);
+  color:var(--text); border-radius:11px; outline:none;
+  transition:border .2s, box-shadow .2s;
+}
+.field input:focus { border-color:var(--accent); box-shadow:0 0 0 3px #625cf51a; }
+.hint { display:block; color:var(--muted); font-size:11px; margin-top:6px; }
+.submit {
+  width:100%; border:0; border-radius:12px; padding:15px;
+  margin-top:25px; color:white; font-weight:800; font-size:14px;
+  background:linear-gradient(110deg,#7168ff,#5048df);
+  box-shadow:0 9px 22px #625cf52c; transition:transform .2s, filter .2s;
+}
+.submit:hover { transform:translateY(-2px); filter:brightness(1.06); }
+.notice { margin-top:15px; color:var(--muted); font-size:11px; line-height:1.6; text-align:center; }
+.error {
+  background:#fff0f0; color:#b42318; border:1px solid #ffd2d2;
+  border-radius:11px; padding:13px; font-size:13px; margin-bottom:18px;
+}
+body.dark .error { background:#351d28; color:#ffb6bd; border-color:#59303b; }
+.result-card { min-height:100%; }
+.result-top {
+  padding:27px; color:white;
+  background:radial-gradient(circle at 90% 5%,#a59eff88,transparent 34%),
+             linear-gradient(135deg,#28275c,#4e49b8 65%,#6962ef);
+}
+.result-top .mini { font-size:12px; color:#e0deff; font-weight:700; }
+.result-top h2 { font-size:22px; margin:13px 0 8px; }
+.result-top p { color:#e1e3ff; line-height:1.7; font-size:13px; margin:0; }
+.price-label { font-size:12px; color:#e0deff; margin-top:26px; }
+.price { font-size:clamp(29px,4vw,39px); letter-spacing:-1px; font-weight:850; margin:7px 0 0; overflow-wrap:anywhere; }
+.result-body { padding:25px 27px 28px; }
+.result-body h3 { font-size:15px; margin:0 0 16px; }
+.explain {
+  border:1px solid var(--border); border-radius:14px; padding:16px;
+  color:var(--muted); font-size:13px; line-height:1.8;
+}
+.explain strong { color:var(--text); }
+.pill {
+  display:inline-flex; margin-top:17px; padding:7px 10px;
+  border-radius:20px; background:var(--soft); color:var(--accent);
+  font-size:11px; font-weight:800;
+}
+.empty {
+  padding:34px 27px 35px; text-align:center;
+}
+.illustration {
+  width:90px; height:90px; margin:4px auto 22px; border-radius:25px;
+  display:grid; place-items:center; font-size:40px;
+  background:linear-gradient(135deg,var(--soft),var(--bg));
+  border:1px solid var(--border);
+}
+.empty h3 { font-size:18px; margin:0 0 10px; }
+.empty p { font-size:13px; color:var(--muted); line-height:1.8; margin:0 auto; max-width:290px; }
+.steps { display:grid; gap:13px; text-align:left; margin-top:27px; }
+.step { display:flex; gap:12px; align-items:center; font-size:12px; color:var(--muted); }
+.step b {
+  flex:0 0 30px; height:30px; display:grid; place-items:center;
+  border-radius:10px; background:var(--soft); color:var(--accent);
+}
+.footer { text-align:center; padding:28px 12px 0; color:var(--muted); font-size:11px; line-height:1.8; }
+@media(max-width:800px) {
+  main { padding:32px 16px 40px; }
+  .layout { grid-template-columns:1fr; }
+  .hero { margin-bottom:25px; }
+}
+@media(max-width:430px) {
+  .nav { padding:14px 16px; }
+  .brand { font-size:17px; }
+  .logo { width:37px; height:37px; }
+  .theme-btn { padding:9px 10px; }
+  .card-head,.form-body { padding-left:19px; padding-right:19px; }
+  .fields { gap:16px 10px; }
+  .field input { padding:12px 9px; font-size:13px; }
+  .result-top,.result-body { padding:22px 20px; }
+}
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="brand">
+    <div class="logo">⌂</div>
+    <div>PropValue<small>SMART PROPERTY ESTIMATES</small></div>
+  </div>
+  <button class="theme-btn" id="themeToggle" type="button" aria-label="Toggle color theme">
+    ☾ Dark mode
+  </button>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="eyebrow">✦ AI-POWERED ESTIMATION</div>
+    <h1>Discover what your property <span>could be worth.</span></h1>
+    <p>Enter your property's details and let our machine learning model estimate its value in seconds. Simple inputs, useful insights.</p>
+  </section>
+
+  <div class="layout">
+    <section class="card">
+      <div class="card-head">
+        <h2>Property details</h2>
+        <p>Fill in the information below to generate your personalized estimate.</p>
+      </div>
+      <div class="form-body">
+        {% if error %}
+          <div class="error" role="alert">⚠ {{ error }}</div>
+        {% endif %}
+
+        <form method="POST" action="/">
+          <div class="section-title"><span class="section-icon">⌂</span> Property information</div>
+          <div class="fields">
+            <div class="field">
+              <label for="Square_Footage">Square footage</label>
+              <input id="Square_Footage" name="Square_Footage" type="number" min="1" max="1000000" step="any" placeholder="e.g. 2000" value="{{ values.get('Square_Footage','') }}" required>
+              <span class="hint">Total interior area</span>
+            </div>
+            <div class="field">
+              <label for="Lot_Size">Lot size</label>
+              <input id="Lot_Size" name="Lot_Size" type="number" min="0" max="1000000" step="any" placeholder="e.g. 0.25" value="{{ values.get('Lot_Size','') }}" required>
+              <span class="hint">Use your dataset's unit</span>
+            </div>
+            <div class="field">
+              <label for="Num_Bedrooms">Bedrooms</label>
+              <input id="Num_Bedrooms" name="Num_Bedrooms" type="number" min="0" max="100" step="1" placeholder="e.g. 3" value="{{ values.get('Num_Bedrooms','') }}" required>
+              <span class="hint">Number of bedrooms</span>
+            </div>
+            <div class="field">
+              <label for="Num_Bathrooms">Bathrooms</label>
+              <input id="Num_Bathrooms" name="Num_Bathrooms" type="number" min="0" max="100" step="any" placeholder="e.g. 2" value="{{ values.get('Num_Bathrooms','') }}" required>
+              <span class="hint">Full or partial, as applicable</span>
+            </div>
+            <div class="field">
+              <label for="Year_Built">Year built</label>
+              <input id="Year_Built" name="Year_Built" type="number" min="1800" max="{{ current_year }}" step="1" placeholder="e.g. 2015" value="{{ values.get('Year_Built','') }}" required>
+              <span class="hint">Original construction year</span>
+            </div>
+            <div class="field">
+              <label for="Garage_Size">Garage size</label>
+              <input id="Garage_Size" name="Garage_Size" type="number" min="0" max="100" step="any" placeholder="e.g. 2" value="{{ values.get('Garage_Size','') }}" required>
+              <span class="hint">Use the dataset's definition</span>
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label for="Neighborhood_Quality">Neighborhood quality (1–10)</label>
+              <input id="Neighborhood_Quality" name="Neighborhood_Quality" type="number" min="1" max="10" step="any" placeholder="e.g. 8" value="{{ values.get('Neighborhood_Quality','') }}" required>
+              <span class="hint">1 = lower quality · 10 = higher quality</span>
+            </div>
+          </div>
+          <button class="submit" type="submit">✦ Estimate my property value →</button>
+          <div class="notice">Your estimate is generated by a trained Linear Regression model.</div>
+        </form>
+      </div>
+    </section>
+
+    <section class="card result-card" aria-live="polite">
+      {% if prediction is not none %}
+        <div class="result-top">
+          <div class="mini">✦ YOUR ESTIMATE IS READY</div>
+          <h2>Here is your predicted property value</h2>
+          <p>Based on the property details you provided.</p>
+          <div class="price-label">Estimated value</div>
+          <div class="price">{{ currency }}{{ "{:,.2f}".format(prediction) }}</div>
+        </div>
+        <div class="result-body">
+          <h3>What this means</h3>
+          <div class="explain">
+            Based on the information entered, the model estimates a property value of
+            <strong>{{ currency }}{{ "{:,.2f}".format(prediction) }}</strong>.
+            This is a mathematical estimate, not a guaranteed selling price or a formal appraisal.
+          </div>
+          <div class="pill">✓ Prediction generated successfully</div>
+        </div>
+      {% else %}
+        <div class="empty">
+          <div class="illustration">⌂</div>
+          <h3>Your estimate will appear here</h3>
+          <p>Complete the property form and select the estimate button. Your predicted value and a plain-language explanation will show up in this panel.</p>
+          <div class="steps">
+            <div class="step"><b>01</b><span>Enter your property information</span></div>
+            <div class="step"><b>02</b><span>Let the ML model analyze your inputs</span></div>
+            <div class="step"><b>03</b><span>Review your estimated property value</span></div>
+          </div>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="footer">
+    PropValue · Built with Flask &amp; Machine Learning<br>
+    Estimates depend on the model and training data. Actual market values may differ.
+  </div>
+</main>
+
+<script>
+const body = document.body;
+const toggle = document.getElementById("themeToggle");
+
+function setTheme(theme) {
+  body.classList.toggle("dark", theme === "dark");
+  toggle.textContent = theme === "dark" ? "☀ Light mode" : "☾ Dark mode";
+  try { localStorage.setItem("propvalue-theme", theme); } catch (e) {}
+}
+let savedTheme = "light";
+try { savedTheme = localStorage.getItem("propvalue-theme") || "light"; } catch (e) {}
+setTheme(savedTheme);
+toggle.addEventListener("click", () => {
+  setTheme(body.classList.contains("dark") ? "light" : "dark");
+});
+</script>
+</body>
+</html>
+"""
+
+
 FEATURES = [
     "Square_Footage",
     "Num_Bedrooms",
@@ -25,337 +334,78 @@ FEATURES = [
     "Neighborhood_Quality",
 ]
 
-CURRENT_YEAR = datetime.now().year
 
-# (min, max) allowed for each input
-LIMITS = {
-    "Square_Footage": (100, 20000),
-    "Num_Bedrooms": (0, 15),
-    "Num_Bathrooms": (0, 15),
-    "Year_Built": (1800, CURRENT_YEAR + 2),
-    "Lot_Size": (0, 100),
-    "Garage_Size": (0, 10),
-    "Neighborhood_Quality": (1, 10),
-}
-
-# Model output is assumed to be in US dollars. Update this to the current rate.
-# If your training data was already in rupees, set this to 1.
-USD_TO_INR = 95
-
-app = Flask(__name__)
-
-
-def money(x):
-    """Format a number in Indian style, e.g. ₹4,37,96,805"""
-    x = int(round(x))
-    sign = "-" if x < 0 else ""
-    s = str(abs(x))
-    if len(s) > 3:
-        head, tail = s[:-3], s[-3:]
-        groups = []
-        while len(head) > 2:
-            groups.insert(0, head[-2:])
-            head = head[:-2]
-        if head:
-            groups.insert(0, head)
-        s = ",".join(groups + [tail])
-    return f"{sign}₹{s}"
-
-
-def in_words(x):
-    if x >= 1e7:
-        return f"{x / 1e7:.2f} Crore"
-    if x >= 1e5:
-        return f"{x / 1e5:.2f} Lakh"
-    return ""
-
-
-def quality_label(q):
-    if q >= 9:
-        return "an excellent"
-    if q >= 7:
-        return "a good"
-    if q >= 5:
-        return "an average"
-    if q >= 3:
-        return "a below-average"
-    return "a poor"
-
-
-def explain(v, price):
-    sqft = int(v["Square_Footage"])
-    beds = int(v["Num_Bedrooms"])
-    baths = int(v["Num_Bathrooms"])
-    year = int(v["Year_Built"])
-    garage = int(v["Garage_Size"])
-    quality = int(v["Neighborhood_Quality"])
-
-    age = max(CURRENT_YEAR - year, 0)
-    age_txt = "brand new" if age <= 1 else f"about {age} years old"
-    garage_txt = (
-        "no garage" if garage == 0
-        else f"a garage for {garage} car{'s' if garage > 1 else ''}"
-    )
-
-    summary = (
-        f"A {sqft:,} sq ft home with {beds} bedroom{'s' if beds != 1 else ''} and "
-        f"{baths} bathroom{'s' if baths != 1 else ''}, {age_txt} (built in {year}), "
-        f"with {garage_txt} in {quality_label(quality)} neighbourhood "
-        f"(rated {quality}/10) is estimated to be worth around {money(price)}"
-        + (f" (about {in_words(price)})." if in_words(price) else ".")
-    )
-    return summary
-
-
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def home():
-    return Response(HTML, mimetype="text/html")
-
-
-@app.route("/predict", methods=["POST"])
-def predict():
-    data = request.get_json(silent=True) or request.form.to_dict()
+    prediction = None
+    error = None
     values = {}
 
-    for name in FEATURES:
-        raw = data.get(name)
-        if raw in (None, ""):
-            return jsonify(error=f"Please enter a value for {name.replace('_', ' ')}."), 400
+    if request.method == "POST":
         try:
-            val = float(raw)
-        except (TypeError, ValueError):
-            return jsonify(error=f"{name.replace('_', ' ')} must be a number."), 400
-        lo, hi = LIMITS[name]
-        if not (lo <= val <= hi):
-            return jsonify(
-                error=f"{name.replace('_', ' ')} must be between {lo} and {hi}."
-            ), 400
-        values[name] = val
+            # Read and validate all required features
+            for feature in FEATURES:
+                raw_value = request.form.get(feature, "").strip()
+                if not raw_value:
+                    raise ValueError(f"Please enter a value for {feature.replace('_', ' ')}.")
+                values[feature] = raw_value
 
-    X = np.array([[values[n] for n in FEATURES]], dtype=float)
-    price = float(model.predict(X)[0]) * USD_TO_INR
+            numbers = {key: float(values[key]) for key in FEATURES}
 
-    if price <= 0:
-        return jsonify(
-            error="These inputs fall outside the range the model was trained on, "
-                  "so a realistic price could not be estimated. Please adjust the values."
-        ), 422
+            if not all(np.isfinite(value) for value in numbers.values()):
+                raise ValueError("Please enter valid, finite numbers.")
 
-    low, high = price * 0.90, price * 1.10
-    return jsonify(
-        price=money(price),
-        low=money(low),
-        high=money(high),
-        per_sqft=money(price / values["Square_Footage"]),
-        summary=explain(values, price),
+            current_year = datetime.now().year
+
+            if not 1 <= numbers["Square_Footage"] <= 1_000_000:
+                raise ValueError("Square footage must be between 1 and 1,000,000.")
+            if not 0 <= numbers["Lot_Size"] <= 1_000_000:
+                raise ValueError("Lot size must be between 0 and 1,000,000.")
+            if not 0 <= numbers["Num_Bedrooms"] <= 100:
+                raise ValueError("Bedrooms must be between 0 and 100.")
+            if numbers["Num_Bedrooms"] % 1 != 0:
+                raise ValueError("Bedrooms must be a whole number.")
+            if not 0 <= numbers["Num_Bathrooms"] <= 100:
+                raise ValueError("Bathrooms must be between 0 and 100.")
+            if not 1800 <= numbers["Year_Built"] <= current_year:
+                raise ValueError(f"Year built must be between 1800 and {current_year}.")
+            if numbers["Year_Built"] % 1 != 0:
+                raise ValueError("Year built must be a whole number.")
+            if not 0 <= numbers["Garage_Size"] <= 100:
+                raise ValueError("Garage size must be between 0 and 100.")
+            if not 1 <= numbers["Neighborhood_Quality"] <= 10:
+                raise ValueError("Neighborhood quality must be between 1 and 10.")
+
+            # Keep the same feature order used during model training
+            input_data = np.array(
+                [[numbers[feature] for feature in FEATURES]],
+                dtype=float,
+            )
+
+            result = float(model.predict(input_data)[0])
+
+            if not np.isfinite(result):
+                raise ValueError("The model returned an invalid result.")
+
+            # A negative property price is not a useful estimate
+            prediction = max(0.0, result)
+
+        except (ValueError, TypeError, OverflowError) as exc:
+            error = str(exc) or "Please check your entries and try again."
+
+    return render_template_string(
+        HTML,
+        prediction=prediction,
+        error=error,
+        values=values,
+        current_year=datetime.now().year,
+        currency="$",
     )
 
 
-HTML = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>House Price Predictor</title>
-<script>
-  (function () {
-    var t = null;
-    try { t = localStorage.getItem("theme"); } catch (e) {}
-    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    document.documentElement.setAttribute("data-theme", t);
-  })();
-</script>
-<style>
-  :root {
-    --bg: #f4f6fb; --card: #ffffff; --text: #111827; --muted: #6b7280;
-    --border: #e5e7eb; --input: #f9fafb; --accent: #4f46e5; --accent2: #7c3aed;
-    --ok-bg: #eef2ff; --err-bg: #fef2f2; --err: #b91c1c; --shadow: 0 10px 30px rgba(17,24,39,.08);
-  }
-  [data-theme="dark"] {
-    --bg: #0b1020; --card: #151b2e; --text: #e5e7eb; --muted: #9ca3af;
-    --border: #263049; --input: #0f1526; --accent: #818cf8; --accent2: #a78bfa;
-    --ok-bg: #1b2142; --err-bg: #2a1417; --err: #fca5a5; --shadow: 0 10px 30px rgba(0,0,0,.4);
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    transition: background .25s, color .25s;
-  }
-  .wrap { max-width: 920px; margin: 0 auto; padding: 28px 18px 48px; }
-  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .logo {
-    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
-    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-size: 22px;
-  }
-  h1 { font-size: 1.25rem; margin: 0; }
-  .sub { color: var(--muted); font-size: .85rem; margin-top: 2px; }
-  .toggle {
-    border: 1px solid var(--border); background: var(--card); color: var(--text);
-    border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: .9rem;
-  }
-  .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
-  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 18px;
-    padding: 22px; box-shadow: var(--shadow);
-  }
-  .card h2 { margin: 0 0 4px; font-size: 1.05rem; }
-  .card p.hint { margin: 0 0 18px; color: var(--muted); font-size: .85rem; }
-  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  @media (max-width: 480px) { .fields { grid-template-columns: 1fr; } }
-  label { display: block; font-size: .8rem; font-weight: 600; margin-bottom: 6px; }
-  label small { color: var(--muted); font-weight: 400; }
-  input {
-    width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--input); color: var(--text); font-size: .95rem; outline: none;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
-  .full { grid-column: 1 / -1; }
-  button.go {
-    margin-top: 18px; width: 100%; padding: 13px; border: 0; border-radius: 12px; cursor: pointer;
-    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
-    font-size: 1rem; font-weight: 600; transition: transform .1s, opacity .2s;
-  }
-  button.go:hover { opacity: .92; }
-  button.go:active { transform: scale(.99); }
-  button.go:disabled { opacity: .6; cursor: wait; }
-  .placeholder { color: var(--muted); text-align: center; padding: 40px 10px; font-size: .92rem; }
-  .price { font-size: 2.2rem; font-weight: 800; margin: 6px 0 2px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
-  .stat { background: var(--input); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
-  .stat b { display: block; font-size: .95rem; margin-top: 3px; }
-  .explain { background: var(--ok-bg); border-radius: 12px; padding: 14px; line-height: 1.55; font-size: .93rem; }
-  .note { color: var(--muted); font-size: .75rem; margin-top: 12px; line-height: 1.4; }
-  .error { background: var(--err-bg); color: var(--err); border-radius: 12px; padding: 14px; font-size: .92rem; }
-  footer { text-align: center; color: var(--muted); font-size: .78rem; margin-top: 28px; }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <div class="logo">🏠</div>
-      <div>
-        <h1>House Price Predictor</h1>
-        <div class="sub">Instant estimate powered by a Linear Regression model</div>
-      </div>
-    </div>
-    <button class="toggle" id="themeBtn" type="button" aria-label="Toggle theme">🌙 Dark</button>
-  </header>
-
-  <div class="grid">
-    <div class="card">
-      <h2>Property details</h2>
-      <p class="hint">Fill in the details below and get an estimated market price.</p>
-      <div class="fields">
-        <div class="full">
-          <label for="Square_Footage">Square footage <small>(sq ft)</small></label>
-          <input id="Square_Footage" type="number" min="100" step="1" placeholder="e.g. 2000">
-        </div>
-        <div>
-          <label for="Num_Bedrooms">Bedrooms</label>
-          <input id="Num_Bedrooms" type="number" min="0" step="1" placeholder="e.g. 3">
-        </div>
-        <div>
-          <label for="Num_Bathrooms">Bathrooms</label>
-          <input id="Num_Bathrooms" type="number" min="0" step="1" placeholder="e.g. 2">
-        </div>
-        <div>
-          <label for="Year_Built">Year built</label>
-          <input id="Year_Built" type="number" step="1" placeholder="e.g. 2005">
-        </div>
-        <div>
-          <label for="Lot_Size">Lot size <small>(acres)</small></label>
-          <input id="Lot_Size" type="number" min="0" step="0.01" placeholder="e.g. 1.5">
-        </div>
-        <div>
-          <label for="Garage_Size">Garage size <small>(cars)</small></label>
-          <input id="Garage_Size" type="number" min="0" step="1" placeholder="e.g. 2">
-        </div>
-        <div>
-          <label for="Neighborhood_Quality">Neighbourhood quality <small>(1–10)</small></label>
-          <input id="Neighborhood_Quality" type="number" min="1" max="10" step="1" placeholder="e.g. 7">
-        </div>
-      </div>
-      <button class="go" id="goBtn" type="button">Predict price</button>
-    </div>
-
-    <div class="card">
-      <h2>Estimated result</h2>
-      <p class="hint">Your prediction will appear here.</p>
-      <div id="result"><div class="placeholder">Enter the property details and press <b>Predict price</b>.</div></div>
-    </div>
-  </div>
-
-  <footer>This is a statistical estimate, not a professional valuation.</footer>
-</div>
-
-<script>
-  var FIELDS = ["Square_Footage","Num_Bedrooms","Num_Bathrooms","Year_Built","Lot_Size","Garage_Size","Neighborhood_Quality"];
-  var root = document.documentElement;
-  var themeBtn = document.getElementById("themeBtn");
-
-  function syncBtn() {
-    themeBtn.textContent = root.getAttribute("data-theme") === "dark" ? "☀️ Light" : "🌙 Dark";
-  }
-  syncBtn();
-  themeBtn.addEventListener("click", function () {
-    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    root.setAttribute("data-theme", next);
-    try { localStorage.setItem("theme", next); } catch (e) {}
-    syncBtn();
-  });
-
-  var btn = document.getElementById("goBtn");
-  var out = document.getElementById("result");
-
-  function esc(s) {
-    var d = document.createElement("div");
-    d.textContent = s;
-    return d.innerHTML;
-  }
-
-  btn.addEventListener("click", async function () {
-    var payload = {};
-    FIELDS.forEach(function (f) { payload[f] = document.getElementById(f).value; });
-    btn.disabled = true; btn.textContent = "Calculating…";
-    try {
-      var res = await fetch("/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      var data = await res.json();
-      if (!res.ok) {
-        out.innerHTML = '<div class="error">⚠️ ' + esc(data.error || "Something went wrong.") + "</div>";
-      } else {
-        out.innerHTML =
-          '<div class="label">Estimated price</div>' +
-          '<div class="price">' + esc(data.price) + "</div>" +
-          '<div class="stats">' +
-            '<div class="stat"><span class="label">Likely range</span><b>' + esc(data.low) + " – " + esc(data.high) + "</b></div>" +
-            '<div class="stat"><span class="label">Price / sq ft</span><b>' + esc(data.per_sqft) + "</b></div>" +
-          "</div>" +
-          '<div class="explain">' + esc(data.summary) + "</div>" +
-          '<div class="note">The range is a rough ±10% guide around the estimate.</div>';
-      }
-    } catch (e) {
-      out.innerHTML = '<div class="error">⚠️ Could not reach the server. Please try again.</div>';
-    }
-    btn.disabled = false; btn.textContent = "Predict price";
-  });
-
-  document.addEventListener("keydown", function (e) { if (e.key === "Enter") btn.click(); });
-</script>
-</body>
-</html>
-"""
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=False,
+    )
